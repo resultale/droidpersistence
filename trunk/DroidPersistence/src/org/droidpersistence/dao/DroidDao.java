@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import android.content.ContentValues;
@@ -15,23 +16,28 @@ import android.provider.BaseColumns;
 
 public abstract class DroidDao<T> {
 	
-	private TableDefinition tableDefinition;
-	private String insertStatement; 	
-	
+	private TableDefinition<T> tableDefinition;
+	private String insertStatement; 		
+	private String tableName;
+	private String[] arrayColumns;
+	private Field[] fieldDefinition;
 	private SQLiteDatabase database;
 	private SQLiteStatement statement;
 	private final Class<T> model;
 	
 
-	public DroidDao(Class<T> model, TableDefinition tableDefinition, SQLiteDatabase database){
+	public DroidDao(Class<T> model, TableDefinition<T> tableDefinition, SQLiteDatabase database){
 		this.model = model;
 		this.database = database;
 						
 		try {
-			setTableDefinition(tableDefinition);
+			this.tableDefinition = tableDefinition;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}	
+		setArrayColumns(getTableDefinition().getArrayColumns());
+		setTableName(getTableDefinition().getTableName());
+		setFieldDefinition(getTableDefinition().getFieldDefinition());
 		createInsertStatement(getTableDefinition().getTableName(), getTableDefinition().getArrayColumns());
 		if(getInsertStatement().trim() != ""){
 			statement = this.database.compileStatement(getInsertStatement());
@@ -43,7 +49,7 @@ public abstract class DroidDao<T> {
 		boolean result = false;
 		if(id > 0){
 			try{
-				database.delete(getTableDefinition().getTableName(), BaseColumns._ID + " = ?", 
+				database.delete(getTableName(), BaseColumns._ID + " = ?", 
 						new String[] { String.valueOf(id) } );
 				result = true;
 			}catch(Exception e){
@@ -56,7 +62,7 @@ public abstract class DroidDao<T> {
 
 	public T get(long id) {
 		T object = null;
-		Cursor cursor = database.query(getTableDefinition().getTableName(), getTableDefinition().getArrayColumns(), 
+		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
 				BaseColumns._ID + " = ?", new String[]{String.valueOf(id)}, null, null, "1");
 		if(cursor.moveToFirst()){
 			try {
@@ -74,7 +80,7 @@ public abstract class DroidDao<T> {
 
 	public List<T> getAll() {		
 		List<T> objectList = new ArrayList<T>();
-		Cursor cursor = database.query(getTableDefinition().getTableName(), getTableDefinition().getArrayColumns(), 
+		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
 				null, null, null, null, "1");
 		if(cursor.getCount() > 0){
 			if(cursor.moveToFirst()){
@@ -100,7 +106,7 @@ public abstract class DroidDao<T> {
 	
 	public List<T> getAllbyClause(String clause, String[] clauseArgs, String groupBy, String having, String orderBy) {		
 		List<T> objectList = new ArrayList<T>();
-		Cursor cursor = database.query(getTableDefinition().getTableName(), getTableDefinition().getArrayColumns(), 
+		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
 				clause, clauseArgs, groupBy, having, orderBy);
 		if(cursor.moveToFirst()){
 			try {
@@ -125,7 +131,7 @@ public abstract class DroidDao<T> {
 
 	public T getByClause(String clause, String[] clauseArgs, String groupBy, String having, String orderBy) {
 		T object = null;
-		Cursor cursor = database.query(getTableDefinition().getTableName(), getTableDefinition().getArrayColumns(), 
+		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
 				clause, clauseArgs, groupBy, having, orderBy);
 		if(cursor.moveToFirst()){
 			try {
@@ -144,10 +150,10 @@ public abstract class DroidDao<T> {
 	public long save(T object) throws Exception{
 		statement.clearBindings();
 		
-		for(int e = 0; e < getTableDefinition().getArrayColumns().length; e++){
+		for(int e = 0; e < getArrayColumns().length; e++){
 			for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
 				Method method = object.getClass().getDeclaredMethods()[i];
-				if(method.getName().equalsIgnoreCase("get"+getTableDefinition().getArrayColumns()[e])){
+				if(method.getName().equalsIgnoreCase("get"+getArrayColumns()[e])){
 					i = object.getClass().getDeclaredMethods().length;
 					Type type = method.getReturnType();	
 					try{
@@ -155,7 +161,7 @@ public abstract class DroidDao<T> {
 							Integer output = (Integer) method.invoke(object);						
 							statement.bindLong(e+1, output.longValue());
 						}else{
-							if(type == Long.class || type == Short.class){
+							if(type == Long.class || type == Short.class || type == long.class){
 								Long output = (Long) method.invoke(object);
 								statement.bindLong(e+1, output);
 							}else{
@@ -193,17 +199,17 @@ public abstract class DroidDao<T> {
 	public void update(T object, long id) throws Exception{
 		final ContentValues values = new ContentValues();
 		
-		for(int e = 0; e < getTableDefinition().getArrayColumns().length; e++){
+		for(int e = 0; e < getArrayColumns().length; e++){
 			for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
 				Method method = object.getClass().getDeclaredMethods()[i];
-				if(method.getName().equalsIgnoreCase("get"+getTableDefinition().getArrayColumns()[e])){
+				if(method.getName().equalsIgnoreCase("get"+getArrayColumns()[e])){
 					i = object.getClass().getDeclaredMethods().length;
 					String outputMethod = method.invoke(object).toString();
-					values.put(tableDefinition.getArrayColumns()[e], outputMethod );
+					values.put(getArrayColumns()[e], outputMethod );
 				}
 			}			
 		}	
-		database.update(getTableDefinition().getTableName(), values, BaseColumns._ID + " = ?", 
+		database.update(getTableName(), values, BaseColumns._ID + " = ?", 
 				new String[]{String.valueOf(id)});
 	}
 
@@ -217,11 +223,11 @@ public abstract class DroidDao<T> {
 	
 	
 	
-	public TableDefinition getTableDefinition() {
+	public TableDefinition<T> getTableDefinition() {
 		return tableDefinition;
 	}
 
-	public void setTableDefinition(TableDefinition tableDefinition) {
+	public void setTableDefinition(TableDefinition<T> tableDefinition) {
 		this.tableDefinition = tableDefinition;
 	}
 
@@ -238,15 +244,14 @@ public abstract class DroidDao<T> {
 			}
 			values.append("?");
 			tableColumns.append(columns[i]);
-		}
-		
-		setInsertStatement("insert into " + tableName + "( _id, " + tableColumns + ") " + "values ( null, " + values + ")");
+		}		
+		setInsertStatement("insert into " + tableName + "(" + tableColumns + ") " + "values ( " + values + ")");
 	}
 	
 	public T buildDataFromCursor(Cursor cursor) throws Exception{
 		T object = null;
 		
-		Field[] fields = getTableDefinition().getFieldDefinition();		  		
+		Field[] fields = getFieldDefinition();		  		
 		if(cursor != null){
 			object = this.model.newInstance();
 			
@@ -275,7 +280,7 @@ public abstract class DroidDao<T> {
 							if(type == int.class){
 								method.invoke(object, Long.valueOf(cursor.getLong(i)).intValue() );
 							}else{
-								if(type == Long.class){
+								if(type == Long.class || type == long.class){
 									method.invoke(object, cursor.getLong(i));
 								}else{
 									if(type == Double.class || type == double.class){
@@ -310,6 +315,30 @@ public abstract class DroidDao<T> {
 			throw new Exception("Cannot be cast a no field object!");
 		}
 		return (T) object;
+	}
+
+	public String getTableName() {
+		return tableName;
+	}
+
+	public void setTableName(String tableName) {
+		this.tableName = tableName;
+	}
+
+	public String[] getArrayColumns() {
+		return arrayColumns;
+	}
+
+	public void setArrayColumns(String[] arrayColumns) {
+		this.arrayColumns = arrayColumns;
+	}
+
+	public Field[] getFieldDefinition() {
+		return fieldDefinition;
+	}
+
+	public void setFieldDefinition(Field[] fieldDefinition) {
+		this.fieldDefinition = fieldDefinition;
 	}
 	
 

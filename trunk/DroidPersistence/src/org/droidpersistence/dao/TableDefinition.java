@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 import org.droidpersistence.annotation.Column;
+import org.droidpersistence.annotation.ForeignKey;
 import org.droidpersistence.annotation.Table;
 
 import android.database.sqlite.SQLiteDatabase;
@@ -20,6 +21,7 @@ public abstract class TableDefinition<T> {
 	private static String[] ARRAY_COLUMNS;
 	private static Field[] FIELD_DEFINITION;
 	private static StringBuilder CREATE_STATEMENT;
+	private static StringBuilder FOREIGN_KEY;
 	private final Class<T> model;
 	private static Class OBJECT;
 	private static TableDefinition singleton;
@@ -47,6 +49,7 @@ public abstract class TableDefinition<T> {
 			TABLE_NAME = object.toString().toUpperCase();
 			
 			CREATE_STATEMENT = new StringBuilder();
+			FOREIGN_KEY = new StringBuilder();
 			COLUMNS = new StringBuilder();
 			
 			CREATE_STATEMENT.append("CREATE TABLE " + TABLE_NAME + " (");	
@@ -78,19 +81,42 @@ public abstract class TableDefinition<T> {
 				CREATE_STATEMENT = null;
 				throw new Exception("Annotation @Column not declared in the field --> "+field.getName());
 			}
+			if(field.isAnnotationPresent(ForeignKey.class)){
+				Annotation fkey_annotation = field.getAnnotation(ForeignKey.class); 
+				Method fkey_methodTableReference = fkey_annotation.getClass().getMethod("tableReference");
+				Object fkey_tableReferenceName = fkey_methodTableReference.invoke(fkey_annotation);
+				
+				Method fkey_methodOnUpCascade = fkey_annotation.getClass().getMethod("onUpdateCascade");
+				Object fkey_OnUpCascadeValue = fkey_methodOnUpCascade.invoke(fkey_annotation);
+				
+				Method fkey_methodOnDelCascade = fkey_annotation.getClass().getMethod("onDeleteCascade");
+				Object fkey_OnDelCascadeValue = fkey_methodOnDelCascade.invoke(fkey_annotation);
+				
+				if(FOREIGN_KEY.toString().equals("")){
+					FOREIGN_KEY.append("FOREIGN KEY("+objectName.toString()+") REFERENCES "+fkey_tableReferenceName.toString().toUpperCase()+" (_id)");
+				}else{
+					FOREIGN_KEY.append(", FOREIGN KEY("+objectName.toString()+") REFERENCES "+fkey_tableReferenceName.toString().toUpperCase()+" (_id)");
+				}
+				if(Boolean.valueOf(fkey_OnUpCascadeValue.toString())){
+					FOREIGN_KEY.append(" ON UPDATE CASCADE ");
+				}
+				if(Boolean.valueOf(fkey_OnDelCascadeValue.toString())){
+					FOREIGN_KEY.append(" ON DELETE CASCADE ");
+				}
+			}
 			
 
 			
-			if(field.getType() == int.class || field.getType() == Integer.class || field.getType() == Long.class){
+			if(field.getType() == int.class || field.getType() == Integer.class || field.getType() == Long.class || field.getType() == long.class){
 				type = " INTEGER ";
 			}else{
-				if(field.getType() == String.class || field.getType() == char.class){
+				if(field.getType() == String.class || field.getType() == char.class || field.getType() == Date.class){
 					type = " TEXT ";
 				}else{
 					if(field.getType() == Double.class || field.getType() == Float.class || field.getType() == double.class){
 						type = " REAL ";
 					}else{
-						if(field.getType() == BigDecimal.class || field.getType() == Date.class || field.getType() == Boolean.class){
+						if(field.getType() == BigDecimal.class || field.getType() == Boolean.class){
 							type = " NUMERIC ";
 						}else{
 							type = " NONE ";
@@ -100,8 +126,13 @@ public abstract class TableDefinition<T> {
 			}
 				
 				if(i == FIELD_DEFINITION.length-1){
-					if(objectName != null){
-						CREATE_STATEMENT.append(objectName.toString()+" "+type+");");						
+					if(objectName != null){						
+						if(FOREIGN_KEY.toString().equals("")){
+							CREATE_STATEMENT.append(objectName.toString()+" "+type+");");
+						}else{
+							CREATE_STATEMENT.append(objectName.toString()+" "+type+",");
+							CREATE_STATEMENT.append(FOREIGN_KEY+");");
+						}
 						COLUMNS.append(objectName.toString());
 					}else{
 						CREATE_STATEMENT = null;
