@@ -1,3 +1,7 @@
+/**
+ * @author Douglas Cavalheiro (doug.cav@ig.com.br)
+ */
+
 package org.droidpersistence.dao;
 
 import java.lang.annotation.Annotation;
@@ -26,7 +30,7 @@ public abstract class TableDefinition<T> {
 	private static Class OBJECT;
 	private static TableDefinition singleton;
 	
-
+	/**Creates a new instance setting a model class to build a definition table */
 	public TableDefinition(Class<T> model){
 		this.singleton = this;
 		this.model = model;
@@ -38,6 +42,7 @@ public abstract class TableDefinition<T> {
 		}		
 	}
 	
+	/**Build a DDL instruction for create table with fields*/
 	@SuppressWarnings({ "unchecked", "null" })
 	public static void createTableDefinition() throws Exception{			
 		
@@ -109,20 +114,14 @@ public abstract class TableDefinition<T> {
 			
 			if(field.getType() == int.class || field.getType() == Integer.class || field.getType() == Long.class || field.getType() == long.class){
 				type = " INTEGER ";
+			}else	if(field.getType() == String.class || field.getType() == char.class || field.getType() == Date.class){
+				type = " TEXT ";
+			}else	if(field.getType() == Double.class || field.getType() == Float.class || field.getType() == double.class){
+				type = " REAL ";
+			}else if(field.getType() == BigDecimal.class || field.getType() == Boolean.class){
+				type = " NUMERIC ";
 			}else{
-				if(field.getType() == String.class || field.getType() == char.class || field.getType() == Date.class){
-					type = " TEXT ";
-				}else{
-					if(field.getType() == Double.class || field.getType() == Float.class || field.getType() == double.class){
-						type = " REAL ";
-					}else{
-						if(field.getType() == BigDecimal.class || field.getType() == Boolean.class){
-							type = " NUMERIC ";
-						}else{
-							type = " NONE ";
-						}
-					}
-				}
+				type = " NONE ";
 			}
 				
 				if(i == FIELD_DEFINITION.length-1){
@@ -151,8 +150,7 @@ public abstract class TableDefinition<T> {
 		}		
 	}
 	
-
-
+	/**Uses the create DLL to create table*/
 	public static void onCreate(SQLiteDatabase db) throws Exception {
 		if(CREATE_STATEMENT != null){
 			db.execSQL(CREATE_STATEMENT.toString());
@@ -161,6 +159,7 @@ public abstract class TableDefinition<T> {
 		}		
 	}
 	
+	/**Upgrade (if necessary) the table*/
 	public static void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {		
 	      try {
 		    db.execSQL("DROP TABLE IF EXISTS " + TableDefinition.TABLE_NAME);
