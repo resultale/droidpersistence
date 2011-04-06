@@ -1,10 +1,12 @@
+/**
+ * @author Douglas Cavalheiro (doug.cav@ig.com.br)
+ */
 package org.droidpersistence.dao;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import android.content.ContentValues;
@@ -25,7 +27,7 @@ public abstract class DroidDao<T> {
 	private SQLiteStatement statement;
 	private final Class<T> model;
 	
-
+	/**Create a instance of Dao class, setting the model, definition of model and the database*/
 	public DroidDao(Class<T> model, TableDefinition<T> tableDefinition, SQLiteDatabase database){
 		this.model = model;
 		this.database = database;
@@ -45,6 +47,7 @@ public abstract class DroidDao<T> {
 		
 	}
 
+	/**Delete object*/
 	public boolean delete(int id) {
 		boolean result = false;
 		if(id > 0){
@@ -59,7 +62,7 @@ public abstract class DroidDao<T> {
 		return result;
 	}
 
-
+	/**Get a object by id*/
 	public T get(long id) {
 		T object = null;
 		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
@@ -78,6 +81,7 @@ public abstract class DroidDao<T> {
 	}
 
 
+	/**List all items*/
 	public List<T> getAll() {		
 		List<T> objectList = new ArrayList<T>();
 		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
@@ -104,6 +108,7 @@ public abstract class DroidDao<T> {
 		return objectList;
 	}
 	
+	/**List items by clause*/
 	public List<T> getAllbyClause(String clause, String[] clauseArgs, String groupBy, String having, String orderBy) {		
 		List<T> objectList = new ArrayList<T>();
 		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
@@ -129,6 +134,7 @@ public abstract class DroidDao<T> {
 	}
 
 
+	/**Get an Object by clause*/
 	public T getByClause(String clause, String[] clauseArgs, String groupBy, String having, String orderBy) {
 		T object = null;
 		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
@@ -146,7 +152,7 @@ public abstract class DroidDao<T> {
 		return object;
 	}
 
-
+	/**Saves the Object*/
 	public long save(T object) throws Exception{
 		statement.clearBindings();
 		
@@ -160,29 +166,22 @@ public abstract class DroidDao<T> {
 						if(type == int.class){
 							Integer output = (Integer) method.invoke(object);						
 							statement.bindLong(e+1, output.longValue());
+						}else if(type == Long.class || type == Short.class || type == long.class){
+							Long output = (Long) method.invoke(object);
+							statement.bindLong(e+1, output);
+						}else if(type == Double.class || type == double.class || type == float.class){
+							Double output = (Double) method.invoke(object);
+							statement.bindDouble(e+1, output);
+						}else if(type == String.class){
+							String output = (String) method.invoke(object);
+							statement.bindString(e+1, output);
+						}else if(type == byte[].class){
+							byte[] output = (byte[]) method.invoke(object);
+							statement.bindBlob(e+1, output);
 						}else{
-							if(type == Long.class || type == Short.class || type == long.class){
-								Long output = (Long) method.invoke(object);
-								statement.bindLong(e+1, output);
-							}else{
-								if(type == Double.class || type == double.class || type == float.class){
-									Double output = (Double) method.invoke(object);
-									statement.bindDouble(e+1, output);
-								}else{
-									if(type == String.class){
-										String output = (String) method.invoke(object);
-										statement.bindString(e+1, output);
-									}else{
-										if(type == byte[].class){
-											byte[] output = (byte[]) method.invoke(object);
-											statement.bindBlob(e+1, output);
-										}else{
-											statement.bindNull(e+1);
-										}										
-									}
-								}
-							}
-						}
+							statement.bindNull(e+1);
+						}						
+												
 					}catch(Exception ex){
 						throw new Exception(" Failed to invoke the method "+method.getName()+", cause:"+ex.getMessage());
 					}
@@ -196,6 +195,7 @@ public abstract class DroidDao<T> {
 	}
 
 
+	/**Update the Object*/
 	public void update(T object, long id) throws Exception{
 		final ContentValues values = new ContentValues();
 		
@@ -221,8 +221,6 @@ public abstract class DroidDao<T> {
 		this.insertStatement = insertStatement;
 	}
 	
-	
-	
 	public TableDefinition<T> getTableDefinition() {
 		return tableDefinition;
 	}
@@ -231,6 +229,7 @@ public abstract class DroidDao<T> {
 		this.tableDefinition = tableDefinition;
 	}
 
+	/**Build a insert statement to the model*/ 
 	private void createInsertStatement(String tableName, String[] columns){
 		StringBuffer values = new StringBuffer();
 		StringBuffer tableColumns = new StringBuffer();
@@ -248,6 +247,7 @@ public abstract class DroidDao<T> {
 		setInsertStatement("insert into " + tableName + "(" + tableColumns + ") " + "values ( " + values + ")");
 	}
 	
+	/**Transforms the row in a Object*/
 	public T buildDataFromCursor(Cursor cursor) throws Exception{
 		T object = null;
 		
@@ -279,33 +279,21 @@ public abstract class DroidDao<T> {
 							Type type = method.getParameterTypes()[0];				  
 							if(type == int.class){
 								method.invoke(object, Long.valueOf(cursor.getLong(i)).intValue() );
+							}else if(type == Long.class || type == long.class){
+								method.invoke(object, cursor.getLong(i));
+							}else if(type == Double.class || type == double.class){
+								method.invoke(object, cursor.getDouble(i));
+							}else if(type == float.class){
+								method.invoke(object, cursor.getFloat(i));
+							}else if(type == String.class){
+								method.invoke(object, cursor.getString(i));
+							}else if(type == Short.class){
+								method.invoke(object, cursor.getShort(i));
 							}else{
-								if(type == Long.class || type == long.class){
-									method.invoke(object, cursor.getLong(i));
-								}else{
-									if(type == Double.class || type == double.class){
-										method.invoke(object, cursor.getDouble(i));
-									}else{
-										if(type == float.class){
-											method.invoke(object, cursor.getFloat(i));
-										}else{
-											if(type == String.class){
-												method.invoke(object, cursor.getString(i));
-											}else{
-												if(type == Short.class){
-													method.invoke(object, cursor.getShort(i));
-												}else{
-													method.invoke(object, cursor.getBlob(i));
-												}
-											}
-										}
-									}
-								}
+								method.invoke(object, cursor.getBlob(i));
 							}
-						
 						}
-
-						}
+					}
 				}catch(Exception e){
 					throw new Exception(" Failed to cast a object, maybe a method not declared, cause:"+e.getMessage()); 
 				}												

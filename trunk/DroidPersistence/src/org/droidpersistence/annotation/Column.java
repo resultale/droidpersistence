@@ -1,3 +1,7 @@
+/**
+ * @author Douglas Cavalheiro (doug.cav@ig.com.br)
+ */
+
 package org.droidpersistence.annotation;
 
 import java.lang.annotation.ElementType;
