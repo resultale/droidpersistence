@@ -146,7 +146,7 @@ public abstract class TableDefinition<T> {
 						throw new Exception("Property 'name' not declared in the field --> "+field.getName());
 					}
 				}
-				ARRAY_COLUMNS[i+1] = field.getName();
+				ARRAY_COLUMNS[i+1] = objectName.toString();
 		}		
 	}
 	
