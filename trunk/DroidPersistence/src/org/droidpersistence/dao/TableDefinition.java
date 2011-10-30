@@ -10,8 +10,11 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.util.Date;
 
+import javax.management.ObjectName;
+
 import org.droidpersistence.annotation.Column;
 import org.droidpersistence.annotation.ForeignKey;
+import org.droidpersistence.annotation.PrimaryKey;
 import org.droidpersistence.annotation.Table;
 
 import android.database.sqlite.SQLiteDatabase;
@@ -20,7 +23,7 @@ import android.provider.BaseColumns;
 public abstract class TableDefinition<T> {
 	
 	private static String TABLE_NAME;
-	private static String PK;
+	private static String PK = "";
 	private static StringBuilder COLUMNS;
 	private static String[] ARRAY_COLUMNS;
 	private static Field[] FIELD_DEFINITION;
@@ -55,10 +58,7 @@ public abstract class TableDefinition<T> {
 			
 			CREATE_STATEMENT = new StringBuilder();
 			FOREIGN_KEY = new StringBuilder();
-			COLUMNS = new StringBuilder();
-			
-			CREATE_STATEMENT.append("CREATE TABLE " + TABLE_NAME + " (");	
-			CREATE_STATEMENT.append(BaseColumns._ID +" INTEGER PRIMARY KEY AUTOINCREMENT, " );
+			COLUMNS = new StringBuilder();	
 			
 		}else{
 			CREATE_STATEMENT = null;
@@ -68,24 +68,45 @@ public abstract class TableDefinition<T> {
 		
 		FIELD_DEFINITION = OBJECT.getDeclaredFields();  
 		
-		ARRAY_COLUMNS  = new String[FIELD_DEFINITION.length+1];
+		ARRAY_COLUMNS  = new String[FIELD_DEFINITION.length];
 		
-		ARRAY_COLUMNS[0] = BaseColumns._ID; 
 		for (int i = 0; i < FIELD_DEFINITION.length ; i++){
 			Field field = FIELD_DEFINITION[i];				
 			Annotation annotation = null;
 			Method methodName = null;
 			Object objectName = null;	
 			String type;
+			String primaryKeyText = "";
+			
+			
 			if(field.isAnnotationPresent(Column.class)){
 				annotation = field.getAnnotation(Column.class); 
 				methodName = annotation.getClass().getMethod("name");
 				objectName = methodName.invoke(annotation);
+				if(objectName.toString() == ""){
+					objectName = field.getName();
+				}
 												
 			}else{
 				CREATE_STATEMENT = null;
 				throw new Exception("Annotation @Column not declared in the field --> "+field.getName());
 			}
+			
+			if(field.isAnnotationPresent(PrimaryKey.class)){
+				PK = objectName.toString();
+				
+				Annotation pKey_annotation = field.getAnnotation(PrimaryKey.class); 
+				Method pkey_methodAutoIncrement = pKey_annotation.getClass().getMethod("autoIncrement");
+				Object pkey_autoIncrement = pkey_methodAutoIncrement.invoke(pKey_annotation);
+				
+				primaryKeyText = " PRIMARY KEY ";
+				
+				if(Boolean.valueOf(pkey_autoIncrement.toString())){
+					primaryKeyText = primaryKeyText + " AUTOINCREMENT ";
+				}
+
+			}
+			
 			if(field.isAnnotationPresent(ForeignKey.class)){
 				Annotation fkey_annotation = field.getAnnotation(ForeignKey.class); 
 				Method fkey_methodTableReference = fkey_annotation.getClass().getMethod("tableReference");
@@ -97,20 +118,26 @@ public abstract class TableDefinition<T> {
 				Method fkey_methodOnDelCascade = fkey_annotation.getClass().getMethod("onDeleteCascade");
 				Object fkey_OnDelCascadeValue = fkey_methodOnDelCascade.invoke(fkey_annotation);
 				
-				if(FOREIGN_KEY.toString().equals("")){
-					FOREIGN_KEY.append("FOREIGN KEY("+objectName.toString()+") REFERENCES "+fkey_tableReferenceName.toString().toUpperCase()+" (_id)");
-				}else{
-					FOREIGN_KEY.append(", FOREIGN KEY("+objectName.toString()+") REFERENCES "+fkey_tableReferenceName.toString().toUpperCase()+" (_id)");
+				Method fkey_methodColumnReference = fkey_annotation.getClass().getMethod("columnReference");
+				Object fkey_columnReference = fkey_methodColumnReference.invoke(fkey_annotation);
+				
+				String columnReference = fkey_columnReference.toString();
+				if(columnReference == ""){
+					columnReference = "_id";
 				}
+				
+				FOREIGN_KEY.append(", FOREIGN KEY ("+objectName.toString()+") REFERENCES "+fkey_tableReferenceName.toString().toUpperCase()+" ("+columnReference+")");
+			
 				if(Boolean.valueOf(fkey_OnUpCascadeValue.toString())){
 					FOREIGN_KEY.append(" ON UPDATE CASCADE ");
 				}
 				if(Boolean.valueOf(fkey_OnDelCascadeValue.toString())){
 					FOREIGN_KEY.append(" ON DELETE CASCADE ");
 				}
+				
+				
 			}
 			
-
 			
 			if(field.getType() == int.class || field.getType() == Integer.class || field.getType() == Long.class || field.getType() == long.class){
 				type = " INTEGER ";
@@ -125,13 +152,8 @@ public abstract class TableDefinition<T> {
 			}
 				
 				if(i == FIELD_DEFINITION.length-1){
-					if(objectName != null){						
-						if(FOREIGN_KEY.toString().equals("")){
-							CREATE_STATEMENT.append(objectName.toString()+" "+type+");");
-						}else{
-							CREATE_STATEMENT.append(objectName.toString()+" "+type+",");
-							CREATE_STATEMENT.append(FOREIGN_KEY+");");
-						}
+					if(objectName != null){	
+						CREATE_STATEMENT.append(objectName.toString()+" "+type+primaryKeyText);
 						COLUMNS.append(objectName.toString());
 					}else{
 						CREATE_STATEMENT = null;
@@ -139,15 +161,44 @@ public abstract class TableDefinition<T> {
 					}
 				}else{
 					if(objectName != null){
-						CREATE_STATEMENT.append(objectName.toString()+" "+type+", ");						
+						CREATE_STATEMENT.append(objectName.toString()+" "+type+primaryKeyText+", ");						
 						COLUMNS.append(objectName.toString()+" , ");
 					}else{
 						CREATE_STATEMENT = null;
 						throw new Exception("Property 'name' not declared in the field --> "+field.getName());
 					}
 				}
-				ARRAY_COLUMNS[i+1] = objectName.toString();
-		}		
+				ARRAY_COLUMNS[i] = objectName.toString();
+		}
+		
+		if(FOREIGN_KEY.toString() != ""){
+			CREATE_STATEMENT.append(FOREIGN_KEY);
+		}
+		CREATE_STATEMENT.append(");");
+		
+		
+		if(getPK() == ""){
+			StringBuilder sb = new StringBuilder();
+			sb.append("CREATE TABLE " + TABLE_NAME + " (");
+			sb.append(BaseColumns._ID +" INTEGER PRIMARY KEY AUTOINCREMENT, " );
+			sb.append(CREATE_STATEMENT);
+			
+			String[] columns = new String[ARRAY_COLUMNS.length+1];
+			columns[0] = BaseColumns._ID;
+			for(int i = 0; i < ARRAY_COLUMNS.length; i++){
+				columns[i+1] = ARRAY_COLUMNS[i];
+			}
+			
+			ARRAY_COLUMNS = columns;
+			
+			CREATE_STATEMENT = sb;
+		}else{
+			StringBuilder sb = new StringBuilder();
+			sb.append("CREATE TABLE " + TABLE_NAME + " (");
+			sb.append(CREATE_STATEMENT);
+			
+			CREATE_STATEMENT = sb;
+		}
 	}
 	
 	/**Uses the create DLL to create table*/
@@ -167,7 +218,7 @@ public abstract class TableDefinition<T> {
 		} catch (Exception e) { 
 			e.printStackTrace();
 		}
-	   }
+	}
 	
 	public static String getTableName() {
 		return TABLE_NAME;
@@ -191,6 +242,10 @@ public abstract class TableDefinition<T> {
 	
 	public static String getPK() {
 		return PK;
+	}
+	
+	public void setPK(String pk){
+		this.PK = pk;
 	}
 
 	public static TableDefinition getInstance(){
