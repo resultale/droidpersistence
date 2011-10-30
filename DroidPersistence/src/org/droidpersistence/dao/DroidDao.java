@@ -3,6 +3,7 @@
  */
 package org.droidpersistence.dao;
 
+import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -16,7 +17,7 @@ import android.database.sqlite.SQLiteStatement;
 import android.provider.BaseColumns;
 
 
-public abstract class DroidDao<T> {
+public abstract class DroidDao<T, ID extends Serializable> {
 	
 	private TableDefinition<T> tableDefinition;
 	private String insertStatement; 		
@@ -25,6 +26,7 @@ public abstract class DroidDao<T> {
 	private Field[] fieldDefinition;
 	private SQLiteDatabase database;
 	private SQLiteStatement statement;
+	private String idColumn;
 	private final Class<T> model;
 	
 	/**Create a instance of Dao class, setting the model, definition of model and the database*/
@@ -41,6 +43,8 @@ public abstract class DroidDao<T> {
 		setTableName(getTableDefinition().getTableName());
 		setFieldDefinition(getTableDefinition().getFieldDefinition());
 		createInsertStatement(getTableDefinition().getTableName(), getTableDefinition().getArrayColumns());
+		setIdColumn(getTableDefinition().getPK());
+		
 		if(getInsertStatement().trim() != ""){
 			statement = this.database.compileStatement(getInsertStatement());
 		}
@@ -48,25 +52,23 @@ public abstract class DroidDao<T> {
 	}
 
 	/**Delete object*/
-	public boolean delete(int id) {
+	public boolean delete(ID id) {
 		boolean result = false;
-		if(id > 0){
 			try{
-				database.delete(getTableName(), BaseColumns._ID + " = ?", 
+				database.delete(getTableName(), getIdColumn() + " = ?", 
 						new String[] { String.valueOf(id) } );
 				result = true;
 			}catch(Exception e){
 				e.printStackTrace();				
 			}			
-		}
 		return result;
 	}
 
 	/**Get a object by id*/
-	public T get(long id) {
+	public T get(ID id) {
 		T object = null;
 		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
-				BaseColumns._ID + " = ?", new String[]{String.valueOf(id)}, null, null, "1");
+				getIdColumn() + " = ?", new String[]{String.valueOf(id)}, null, null, "1");
 		if(cursor.moveToFirst()){
 			try {
 				object = buildDataFromCursor(cursor);
@@ -154,49 +156,70 @@ public abstract class DroidDao<T> {
 
 	/**Saves the Object*/
 	public long save(T object) throws Exception{
-		statement.clearBindings();
+		long result = 0;
 		
-		for(int e = 0; e < getArrayColumns().length; e++){
-			for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
-				Method method = object.getClass().getDeclaredMethods()[i];
-				if(method.getName().equalsIgnoreCase("get"+getArrayColumns()[e])){
-					i = object.getClass().getDeclaredMethods().length;
-					Type type = method.getReturnType();	
-					try{
-						if(type == int.class){
-							Integer output = (Integer) method.invoke(object);						
-							statement.bindLong(e+1, output.longValue());
-						}else if(type == Long.class || type == Short.class || type == long.class){
-							Long output = (Long) method.invoke(object);
-							statement.bindLong(e+1, output);
-						}else if(type == Double.class || type == double.class || type == float.class){
-							Double output = (Double) method.invoke(object);
-							statement.bindDouble(e+1, output);
-						}else if(type == String.class){
-							String output = (String) method.invoke(object);
-							statement.bindString(e+1, output);
-						}else if(type == byte[].class){
-							byte[] output = (byte[]) method.invoke(object);
-							statement.bindBlob(e+1, output);
-						}else{
-							statement.bindNull(e+1);
-						}						
-												
-					}catch(Exception ex){
-						throw new Exception(" Failed to invoke the method "+method.getName()+", cause:"+ex.getMessage());
+		if(getTableDefinition().getPK() == ""){
+			statement.clearBindings();
+			
+			for(int e = 0; e < getArrayColumns().length; e++){
+				for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
+					Method method = object.getClass().getDeclaredMethods()[i];
+					if(method.getName().equalsIgnoreCase("get"+getArrayColumns()[e])){
+						i = object.getClass().getDeclaredMethods().length;
+						Type type = method.getReturnType();	
+						try{
+							if(type == int.class){
+								Integer output = (Integer) method.invoke(object);						
+								statement.bindLong(e+1, output.longValue());
+							}else if(type == Long.class || type == Short.class || type == long.class){
+								Long output = (Long) method.invoke(object);
+								statement.bindLong(e+1, output);
+							}else if(type == Double.class || type == double.class || type == float.class){
+								Double output = (Double) method.invoke(object);
+								statement.bindDouble(e+1, output);
+							}else if(type == String.class){
+								String output = (String) method.invoke(object);
+								statement.bindString(e+1, output);
+							}else if(type == byte[].class){
+								byte[] output = (byte[]) method.invoke(object);
+								statement.bindBlob(e+1, output);
+							}else{
+								statement.bindNull(e+1);
+							}						
+													
+						}catch(Exception ex){
+							throw new Exception(" Failed to invoke the method "+method.getName()+", cause:"+ex.getMessage());
+						}
 					}
 				}
-			}
 
+			}
+			
+			result = statement.executeInsert();	
+		}else{
+			final ContentValues values = new ContentValues();
+			
+			for(int e = 0; e < getArrayColumns().length; e++){
+				for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
+					Method method = object.getClass().getDeclaredMethods()[i];
+					if(method.getName().equalsIgnoreCase("get"+getArrayColumns()[e])){
+						i = object.getClass().getDeclaredMethods().length;
+						String outputMethod = method.invoke(object).toString();
+						values.put(getArrayColumns()[e], outputMethod );
+					}
+				}			
+			}	
+			
+			result = database.insert(getTableName(), null, values);
 		}
 		
 		
-		return statement.executeInsert();
+		return result;
 	}
 
 
 	/**Update the Object*/
-	public void update(T object, long id) throws Exception{
+	public void update(T object, ID id) throws Exception{
 		final ContentValues values = new ContentValues();
 		
 		for(int e = 0; e < getArrayColumns().length; e++){
@@ -209,7 +232,7 @@ public abstract class DroidDao<T> {
 				}
 			}			
 		}	
-		database.update(getTableName(), values, BaseColumns._ID + " = ?", 
+		database.update(getTableName(), values, getIdColumn() + " = ?", 
 				new String[]{String.valueOf(id)});
 	}
 
@@ -250,30 +273,34 @@ public abstract class DroidDao<T> {
 	/**Transforms the row in a Object*/
 	public T buildDataFromCursor(Cursor cursor) throws Exception{
 		T object = null;
+		int aux = 0;
 		
 		Field[] fields = getFieldDefinition();		  		
 		if(cursor != null){
 			object = this.model.newInstance();
 			
-			if(cursor.getColumnName(0).equalsIgnoreCase("_id")){
-				Method[] methods = object.getClass().getMethods();					
-				for (int e = 0; e < methods.length; e++){
-					if(methods[e].getName().trim().equalsIgnoreCase("setId")){	
-						methods[e].invoke(object, cursor.getLong(0));
-						e = methods.length;						
-					}						
-				}
-			}
-			
 			Method[] methods = object.getClass().getMethods();
 			
-			for(int i = 1; i < cursor.getColumnCount(); i++){				
+			for(int i = 0; i < cursor.getColumnCount(); i++){				
+				
+				if( (i == 0) && (cursor.getColumnName(0).equalsIgnoreCase("_id"))){
+					i = 1;
+					aux = 0;
+					for (int e = 0; e < methods.length; e++){
+						if(methods[e].getName().trim().equalsIgnoreCase("setId")){	
+							methods[e].invoke(object, cursor.getLong(0));
+							e = methods.length;						
+						}						
+					}
+				}else{
+					aux = i - 1;
+				}
 				
 				try{						
 													
 					for (int e = 0; e < methods.length; e++){							
 						
-						if(methods[e].getName().trim().equalsIgnoreCase("set"+fields[i-1].getName())){							
+						if(methods[e].getName().trim().equalsIgnoreCase("set"+fields[aux].getName())){							
 							Method method = methods[e]; 
 							e = methods.length;
 							Type type = method.getParameterTypes()[0];				  
@@ -328,6 +355,15 @@ public abstract class DroidDao<T> {
 	public void setFieldDefinition(Field[] fieldDefinition) {
 		this.fieldDefinition = fieldDefinition;
 	}
+
+	public String getIdColumn() {
+		return idColumn;
+	}
+
+	public void setIdColumn(String idColumn) {
+		this.idColumn = idColumn;
+	}
+	
 	
 
 }
