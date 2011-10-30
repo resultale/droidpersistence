@@ -1,0 +1,11 @@
+<!DOCTYPE project [
+       <!ENTITY common SYSTEM "common.xml">
+]>
+<project name="droidsoapclient" basedir="." default="build">
+	<property name="dist.dir" location="dist" />
+	<target name="build">
+		<delete dir="${dist.dir}" />
+		<mkdir dir="${dist.dir}" />
+		<jar destfile="${dist.dir}/droidpersistence.jar" basedir="${basedir}/bin" />
+	</target>
+</project>
