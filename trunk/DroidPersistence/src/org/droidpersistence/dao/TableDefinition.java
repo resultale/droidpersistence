@@ -8,7 +8,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import javax.management.ObjectName;
 
@@ -16,7 +18,9 @@ import org.droidpersistence.annotation.Column;
 import org.droidpersistence.annotation.ForeignKey;
 import org.droidpersistence.annotation.PrimaryKey;
 import org.droidpersistence.annotation.Table;
+import org.droidpersistence.model.FieldModel;
 
+import android.app.ListActivity;
 import android.database.sqlite.SQLiteDatabase;
 import android.provider.BaseColumns;
 
@@ -32,6 +36,7 @@ public abstract class TableDefinition<T> {
 	private final Class<T> model;
 	private static Class OBJECT;
 	private static TableDefinition singleton;
+	private static List<FieldModel> LIST_FIELD_MODEL;
 	
 	/**Creates a new instance setting a model class to build a definition table */
 	public TableDefinition(Class<T> model){
@@ -59,6 +64,7 @@ public abstract class TableDefinition<T> {
 			CREATE_STATEMENT = new StringBuilder();
 			FOREIGN_KEY = new StringBuilder();
 			COLUMNS = new StringBuilder();	
+			LIST_FIELD_MODEL = new ArrayList<FieldModel>();
 			
 		}else{
 			CREATE_STATEMENT = null;
@@ -171,6 +177,10 @@ public abstract class TableDefinition<T> {
 					}
 				}
 				ARRAY_COLUMNS[i] = objectName.toString();
+				FieldModel fieldModel = new FieldModel();
+				fieldModel.setColumnName(objectName.toString());
+				fieldModel.setFieldName(field.getName());
+				LIST_FIELD_MODEL.add(fieldModel);
 		}
 		
 		if(FOREIGN_KEY.toString() != ""){
@@ -252,6 +262,14 @@ public abstract class TableDefinition<T> {
 
 	public static TableDefinition getInstance(){
 		return singleton ;
+	}
+
+	public static List<FieldModel> getLIST_FIELD_MODEL() {
+		return LIST_FIELD_MODEL;
+	}
+
+	public static void setLIST_FIELD_MODEL(List<FieldModel> lIST_FIELD_MODEL) {
+		LIST_FIELD_MODEL = lIST_FIELD_MODEL;
 	}
 	
 	
