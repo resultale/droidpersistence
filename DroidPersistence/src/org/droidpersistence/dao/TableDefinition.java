@@ -141,12 +141,14 @@ public abstract class TableDefinition<T> {
 			
 			if(field.getType() == int.class || field.getType() == Integer.class || field.getType() == Long.class || field.getType() == long.class){
 				type = " INTEGER ";
-			}else	if(field.getType() == String.class || field.getType() == char.class || field.getType() == Date.class){
+			}else	if(field.getType() == String.class || field.getType() == char.class){
 				type = " TEXT ";
 			}else	if(field.getType() == Double.class || field.getType() == Float.class || field.getType() == double.class){
 				type = " REAL ";
 			}else if(field.getType() == BigDecimal.class || field.getType() == Boolean.class){
 				type = " NUMERIC ";
+			}else if(field.getType() == Date.class){
+				type = " DATE ";
 			}else{
 				type = " NONE ";
 			}

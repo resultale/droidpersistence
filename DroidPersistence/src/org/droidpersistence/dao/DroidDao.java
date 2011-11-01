@@ -8,13 +8,15 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+
+import org.droidpersistence.util.DroidUtils;
 
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
-import android.provider.BaseColumns;
 
 
 public abstract class DroidDao<T, ID extends Serializable> {
@@ -180,6 +182,9 @@ public abstract class DroidDao<T, ID extends Serializable> {
 							}else if(type == String.class){
 								String output = (String) method.invoke(object);
 								statement.bindString(e+1, output);
+							}else if(type == Date.class){
+								Date output = (Date) method.invoke(object);
+								statement.bindString(e+1, DroidUtils.convertDateToString(output));
 							}else if(type == byte[].class){
 								byte[] output = (byte[]) method.invoke(object);
 								statement.bindBlob(e+1, output);
@@ -314,6 +319,8 @@ public abstract class DroidDao<T, ID extends Serializable> {
 								method.invoke(object, cursor.getFloat(i));
 							}else if(type == String.class){
 								method.invoke(object, cursor.getString(i));
+							}else if(type == Date.class){
+								method.invoke(object, DroidUtils.convertStringToDate(cursor.getString(i)));
 							}else if(type == Short.class){
 								method.invoke(object, cursor.getShort(i));
 							}else{
