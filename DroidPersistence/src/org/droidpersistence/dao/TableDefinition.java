@@ -89,7 +89,7 @@ public abstract class TableDefinition<T> {
 				annotation = field.getAnnotation(Column.class); 
 				methodName = annotation.getClass().getMethod("name");
 				objectName = methodName.invoke(annotation);
-				if(objectName.toString() == ""){
+				if(objectName == null || objectName.toString() == ""){
 					objectName = field.getName();
 				}
 												
