@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.droidpersistence.model.FieldModel;
 import org.droidpersistence.util.DroidUtils;
 
 import android.content.ContentValues;
@@ -30,6 +31,7 @@ public abstract class DroidDao<T, ID extends Serializable> {
 	private SQLiteStatement statement;
 	private String idColumn;
 	private final Class<T> model;
+	private List<FieldModel> listFieldModels;
 	
 	/**Create a instance of Dao class, setting the model, definition of model and the database*/
 	public DroidDao(Class<T> model, TableDefinition<T> tableDefinition, SQLiteDatabase database){
@@ -46,6 +48,7 @@ public abstract class DroidDao<T, ID extends Serializable> {
 		setFieldDefinition(getTableDefinition().getFieldDefinition());
 		createInsertStatement(getTableDefinition().getTableName(), getTableDefinition().getArrayColumns());
 		setIdColumn(getTableDefinition().getPK());
+		setListFieldModels(getTableDefinition().getLIST_FIELD_MODEL());
 		
 		if(getInsertStatement().trim() != ""){
 			statement = this.database.compileStatement(getInsertStatement());
@@ -203,17 +206,27 @@ public abstract class DroidDao<T, ID extends Serializable> {
 			result = statement.executeInsert();	
 		}else{
 			final ContentValues values = new ContentValues();
-			
-			for(int e = 0; e < getArrayColumns().length; e++){
+			String value;
+			for(int e = 0; e < getListFieldModels().size(); e++){
+				FieldModel fieldModel = getListFieldModels().get(e);
 				for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
 					Method method = object.getClass().getDeclaredMethods()[i];
-					if(method.getName().equalsIgnoreCase("get"+getArrayColumns()[e])){
+					if(method.getName().equalsIgnoreCase("get"+fieldModel.getFieldName())){
 						i = object.getClass().getDeclaredMethods().length;
-						String outputMethod = method.invoke(object).toString();
-						values.put(getArrayColumns()[e], outputMethod );
+						Object outputMethod = method.invoke(object);
+						Type type = method.getReturnType();	
+						//helps if the return type of method is Date (java.Utils)
+						if(type == Date.class){
+							Date date = (Date) outputMethod;
+							value = DroidUtils.convertDateToString(date);
+						}else{
+							value = outputMethod.toString();
+						}
+							
+						values.put(fieldModel.getColumnName(), value );
 					}
-				}			
-			}	
+				}
+			}
 			
 			result = database.insert(getTableName(), null, values);
 		}
@@ -226,17 +239,28 @@ public abstract class DroidDao<T, ID extends Serializable> {
 	/**Update the Object*/
 	public void update(T object, ID id) throws Exception{
 		final ContentValues values = new ContentValues();
-		
-		for(int e = 0; e < getArrayColumns().length; e++){
+		String value;
+		for(int e = 0; e < getListFieldModels().size(); e++){
+			FieldModel fieldModel = getListFieldModels().get(e);
 			for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
 				Method method = object.getClass().getDeclaredMethods()[i];
-				if(method.getName().equalsIgnoreCase("get"+getArrayColumns()[e])){
+				if(method.getName().equalsIgnoreCase("get"+fieldModel.getFieldName())){
 					i = object.getClass().getDeclaredMethods().length;
-					String outputMethod = method.invoke(object).toString();
-					values.put(getArrayColumns()[e], outputMethod );
+					Object outputMethod = method.invoke(object);
+					Type type = method.getReturnType();	
+					//helps if the return type of method is Date (java.Utils)
+					if(type == Date.class){
+						Date date = (Date) outputMethod;
+						value = DroidUtils.convertDateToString(date);
+					}else{
+						value = outputMethod.toString();
+					}
+						
+					values.put(fieldModel.getColumnName(), value );
 				}
-			}			
-		}	
+			}
+		}
+			
 		database.update(getTableName(), values, getIdColumn() + " = ?", 
 				new String[]{String.valueOf(id)});
 	}
@@ -369,6 +393,14 @@ public abstract class DroidDao<T, ID extends Serializable> {
 
 	public void setIdColumn(String idColumn) {
 		this.idColumn = idColumn;
+	}
+
+	public List<FieldModel> getListFieldModels() {
+		return listFieldModels;
+	}
+
+	public void setListFieldModels(List<FieldModel> listFieldModels) {
+		this.listFieldModels = listFieldModels;
 	}
 	
 	
