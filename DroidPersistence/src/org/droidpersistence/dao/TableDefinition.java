@@ -177,10 +177,12 @@ public abstract class TableDefinition<T> {
 					}
 				}
 				ARRAY_COLUMNS[i] = objectName.toString();
-				FieldModel fieldModel = new FieldModel();
-				fieldModel.setColumnName(objectName.toString());
-				fieldModel.setFieldName(field.getName());
-				LIST_FIELD_MODEL.add(fieldModel);
+				if(! primaryKeyText.contains("AUTOINCREMENT")){
+					FieldModel fieldModel = new FieldModel();
+					fieldModel.setColumnName(objectName.toString());
+					fieldModel.setFieldName(field.getName());
+					LIST_FIELD_MODEL.add(fieldModel);
+				}				
 		}
 		
 		if(FOREIGN_KEY.toString() != ""){
