@@ -236,7 +236,7 @@ public abstract class DroidDao<T, ID extends Serializable> {
 	}
 
 
-	/**Update the Object*/
+	/**Update the Object by ID*/
 	public void update(T object, ID id) throws Exception{
 		final ContentValues values = new ContentValues();
 		String value;
@@ -263,6 +263,35 @@ public abstract class DroidDao<T, ID extends Serializable> {
 			
 		database.update(getTableName(), values, getIdColumn() + " = ?", 
 				new String[]{String.valueOf(id)});
+	}
+	
+	/**Update the Object by Clause*/
+	public void update(T object, String clause, String[] clauseArgs) throws Exception{
+		final ContentValues values = new ContentValues();
+		String value;
+		for(int e = 0; e < getListFieldModels().size(); e++){
+			FieldModel fieldModel = getListFieldModels().get(e);
+			for(int i = 0; i < object.getClass().getDeclaredMethods().length; i++){
+				Method method = object.getClass().getDeclaredMethods()[i];
+				if(method.getName().equalsIgnoreCase("get"+fieldModel.getFieldName())){
+					i = object.getClass().getDeclaredMethods().length;
+					Object outputMethod = method.invoke(object);
+					Type type = method.getReturnType();	
+					//helps if the return type of method is Date (java.Utils)
+					if(type == Date.class){
+						Date date = (Date) outputMethod;
+						value = DroidUtils.convertDateToString(date);
+					}else{
+						value = outputMethod.toString();
+					}
+						
+					values.put(fieldModel.getColumnName(), value );
+				}
+			}
+		}
+			
+		database.update(getTableName(), values, clause, 
+				clauseArgs);
 	}
 
 	public String getInsertStatement() {
@@ -302,7 +331,6 @@ public abstract class DroidDao<T, ID extends Serializable> {
 	/**Transforms the row in a Object*/
 	public T buildDataFromCursor(Cursor cursor) throws Exception{
 		T object = null;
-		int aux = 0;
 		
 		Field[] fields = getFieldDefinition();		  		
 		if(cursor != null){
@@ -312,24 +340,11 @@ public abstract class DroidDao<T, ID extends Serializable> {
 			
 			for(int i = 0; i < cursor.getColumnCount(); i++){				
 				
-				if( (i == 0) && (cursor.getColumnName(0).equalsIgnoreCase("_id"))){
-					i = 1;
-					aux = 0;
-					for (int e = 0; e < methods.length; e++){
-						if(methods[e].getName().trim().equalsIgnoreCase("setId")){	
-							methods[e].invoke(object, cursor.getLong(0));
-							e = methods.length;						
-						}						
-					}
-				}else{
-					aux = i - 1;
-				}
-				
 				try{						
 													
 					for (int e = 0; e < methods.length; e++){							
 						
-						if(methods[e].getName().trim().equalsIgnoreCase("set"+fields[aux].getName())){							
+						if(methods[e].getName().trim().equalsIgnoreCase("set"+fields[i].getName())){							
 							Method method = methods[e]; 
 							e = methods.length;
 							Type type = method.getParameterTypes()[0];				  
