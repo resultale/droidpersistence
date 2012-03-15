@@ -142,10 +142,10 @@ public abstract class DroidDao<T, ID extends Serializable> {
 
 
 	/**Get an Object by clause*/
-	public T getByClause(String clause, String[] clauseArgs, String groupBy, String having, String orderBy) {
+	public T getByClause(String clause, String[] clauseArgs) {
 		T object = null;
 		Cursor cursor = database.query(getTableName(), getArrayColumns(), 
-				clause, clauseArgs, groupBy, having, orderBy);
+				clause, clauseArgs, null, null, "1");
 		if(cursor.moveToFirst()){
 			try {
 				object = buildDataFromCursor(cursor);
@@ -362,6 +362,8 @@ public abstract class DroidDao<T, ID extends Serializable> {
 								method.invoke(object, DroidUtils.convertStringToDate(cursor.getString(i)));
 							}else if(type == Short.class){
 								method.invoke(object, cursor.getShort(i));
+							}else if(type == Boolean.class || type == boolean.class){
+								method.invoke(object, (cursor.getInt(i) == 1));
 							}else{
 								method.invoke(object, cursor.getBlob(i));
 							}
