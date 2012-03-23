@@ -157,6 +157,7 @@ public abstract class DroidDao<T, ID extends Serializable> {
 			cursor.close();
 		}		
 		return object;
+		
 	}
 
 	/**Saves the Object*/
@@ -348,7 +349,7 @@ public abstract class DroidDao<T, ID extends Serializable> {
 							Method method = methods[e]; 
 							e = methods.length;
 							Type type = method.getParameterTypes()[0];				  
-							if(type == int.class){
+							if(type == int.class || type == Integer.class){
 								method.invoke(object, Long.valueOf(cursor.getLong(i)).intValue() );
 							}else if(type == Long.class || type == long.class){
 								method.invoke(object, cursor.getLong(i));
